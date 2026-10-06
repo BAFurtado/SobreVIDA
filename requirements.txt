@@ -1,0 +1,7 @@
+# mesa is pinned exactly: the calibration was produced on 2.2.4, later 2.x releases
+# change behaviour, and mesa 3 removed the scheduler API the model uses.
+mesa==2.2.4
+numpy>=1.26,<2.0
+pandas>=2.0,<3.0
+scipy>=1.11
+odfpy>=1.4
