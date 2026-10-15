@@ -4,9 +4,9 @@ Every constant the model reads is defined here and nowhere else. Each carries it
 unit and its provenance, in one of four kinds:
 
   data        taken from a cited source and never adjusted to improve fit
-  calibrated  fitted to one empirical moment (three parameters only)
+  calibrated  fitted to an empirical moment (five parameters)
   argument    fixed by a stated argument rather than by a moment
-  assumption  set by the modeller; varied in the sensitivity analysis where noted
+  assumption  set by the modeller
 
 Parameter sweeps override these by assignment. `scenarios._apply` writes both this
 module and `agents`, because `agents` binds several of them by name at import.
@@ -29,11 +29,11 @@ MONITORING_LEVEL = 0.2
 # uncovered one carries only the threshold boost.
 # Assumption, from a single-site practitioner estimate: about a quarter of visits do
 # not start or are interrupted for want of a usable address (IPEA 2019, pp. 45, 56).
-# An optimistic ceiling, so the scenario arms bracket it at 0.0 and 1.0.
+# An optimistic ceiling, so the scenarios bracket it at 0.0 and 1.0.
 PATROL_COVERAGE = 0.75
 
-# A denunciation reaches an active order in two stages, with different denominators.
-# Chained, 0.653 x 0.655 = 0.428 orders per denunciation.
+# A report reaches an active order in two stages, with different denominators.
+# Chained, 0.653 x 0.655 = 0.428 orders per report.
 # Data: Polícia Civil do Rio Grande do Sul, Divisão de Planejamento e Coordenação,
 # "Ocorrências policiais de violência doméstica em Porto Alegre de 2012 a 2023"
 # (freedom-of-information request 44.026). Share of threat and bodily-harm occurrences
@@ -99,8 +99,7 @@ POST_SEP_WINDOW = 12
 # because it is the approach that art. 24-A defines as the breach.
 # Assumption, and NOT IDENTIFIED by the calibration moments: decomposing the
 # non-compliance rate by the conduct that breached the order first leaves this channel
-# contributing 0.02 to 0.05 of it, so the moment cannot locate the parameter. Varied in
-# the sensitivity analysis.
+# contributing 0.02 to 0.05 of it, so the moment cannot locate the parameter.
 POST_SEP_CONTACT_BASE = 0.15
 
 # ---------------------------------------------------------------------------
@@ -197,7 +196,7 @@ ESCALATION_MAX = 0.15
 # Weights of the three inputs to the propensity to act. They sum to 1, so the target
 # lies in [0, 1] and the threshold range below reads on the same scale.
 PER_ACTION_EXPERIENCE = 0.5   # assaults received in the current relationship
-PER_ACTION_NETWORK = 0.3      # share of female peers who denounced or left this year
+PER_ACTION_NETWORK = 0.3      # share of female peers who reported or left this year
 PER_ACTION_AUTONOMY = 0.2     # economic autonomy (working)
 
 # Assaults in the current relationship at which the experience component saturates.
@@ -206,7 +205,7 @@ PER_ACTION_AUTONOMY = 0.2     # economic autonomy (working)
 ACTION_EXPERIENCE_REF = 12
 
 # Threshold on the propensity to act, drawn U[ACTION_THRESHOLD_MIN,
-# ACTION_THRESHOLD_MAX] once per woman. Above it she denounces or leaves; below it she
+# ACTION_THRESHOLD_MAX] once per woman. Above it she reports or leaves; below it she
 # remains.
 # CALIBRATED against two annual moments, both on a denominator of ASSAULTED women:
 #   reporting   interval [0.142, 0.257]  (FBSP p. 41; see below on why an interval)
@@ -225,7 +224,7 @@ ACTION_EXPERIENCE_REF = 12
 ACTION_THRESHOLD_MIN = 0.13
 ACTION_THRESHOLD_MAX = 0.65
 
-# Composition of the act, conditional on acting: the share who denounce rather than
+# Composition of the act, conditional on acting: the share who report rather than
 # leave. ARGUMENT, not calibrated: 0.20 / (0.20 + 0.15) is the share implied by the
 # ratio of the two annual targets, at the midpoint of the reporting interval.
 ACTION_DENOUNCE_SHARE = 0.571
@@ -264,9 +263,10 @@ class Calibration:
 
     Each channel is min-max normalised into [0, PER_*] and clipped, which is what
     keeps the network term from feeding disposition back into itself without bound.
-    The ceilings are ordered: the individual channel dominates by an order of
-    magnitude, and the societal, network and dyadic channels modulate it in that
-    order, so the environment cannot by itself carry a man across his threshold.
+    The individual ceiling is more than four times any other, and the network,
+    societal and dyadic ceilings follow in that order. The three non-individual
+    ceilings sum to about 0.40, below THRESHOLD_MIN, so the environment cannot by
+    itself carry a man across his threshold.
     """
 
     # Bounds of the accumulated stress stock. A Porto Alegre run spans 0.47 (p10) to
@@ -356,6 +356,9 @@ class Weight:
 
     SIZE_INFLUENCE is the number of same-gender peers each agent is assigned, without
     replacement, at initialisation. Networks are not rewired thereafter. Assumption.
+    MIN and MAX bound the uniform link weights. Person.network_influence multiplies each
+    peer's disposition by its weight, so at these values the peers' part of the term is
+    about a hundredth of a disposition and the term is negative for every agent.
     """
 
     SIZE: int = 24

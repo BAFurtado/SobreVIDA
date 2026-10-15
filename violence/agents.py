@@ -354,16 +354,14 @@ class Person(Agent):
         # Adding new stress to memory
         self.accumulated_stress += stress_level
 
-    # Signed, mean-based peer influence on disposition (both amplifying and damping).
+    # Peer term on disposition: weighted peer mean minus own disposition.
     def network_influence(self):
-        """Two-directional peer influence, bounded-friendly.
+        """Mean of weight x peer disposition, minus the agent's own disposition.
 
-        Uses the MEAN of weighted peer dispositions (not the sum) so the term does not
-        scale with network size — the sum was the driver of the disposition runaway.
-
-        The base effect is contagion/damping toward the peer mean *relative to the
-        agent's own disposition*: peers with higher disposition pull it up, peers with
-        lower disposition pull it down (this is what makes it work "both ways").
+        The MEAN (not the sum) keeps the term from growing with network size. The link
+        weights (settings.Weight.MIN to MAX, at most 0.032) make the peer mean about a
+        hundredth of a disposition, so the result is negative for every agent: the
+        term damps disposition, more so the higher the agent's own.
 
         Prosocial peer norms (denouncing / leaving) do NOT enter here. They raise a
         woman's propensity to ACT, which is a separate stock — see
@@ -377,7 +375,6 @@ class Person(Agent):
         peer_mean = np.mean([agent.disposition * self.weight_vector[agent]
                              for agent in self.weight_vector.keys()])
 
-        # Contagion (positive) / damping (negative) toward the peer mean.
         return peer_mean - self.disposition
 
     @staticmethod
@@ -408,8 +405,8 @@ class Person(Agent):
         target_disposition = individual + societal + self.partner_component()
 
         if self.weight_vector:
-            # Bounded, signed network term in [-PER_NETWORK, +PER_NETWORK] (tanh squashing),
-            # so peers can both raise and damp disposition without it ever running away.
+            # Network term bounded to [-PER_NETWORK, +PER_NETWORK] by tanh. At the drawn
+            # weights it is negative for every agent.
             network = Calibration.PER_NETWORK * np.tanh(self.network_influence())
             target_disposition += network
 
@@ -684,17 +681,11 @@ class Men(Person):
     def violence_hazard(self):
         """Per-step probability of assaulting, logistic in the gap `disposition - threshold`.
 
-        Replaces a deterministic `disposition > threshold` comparison. Evaluated every step
-        over a 144-month run, that comparison made violence a function of the LIFETIME
-        MAXIMUM of disposition — and maxima of long noisy series are near-homogeneous, so
-        the schooling gradient carried by disposition (-0.46 on its mean) reached the
-        outcome as -0.07, and a draw on threshold alone classified 93% of men correctly.
-
-        A smooth hazard makes the whole trajectory count rather than only its highest
-        point: a man who sits high for years differs from one who spiked once.
-
-        TRIGGER_SLOPE -> 0 recovers the deterministic trigger exactly, so the previous
-        behaviour is the limiting case of this one and the two are comparable.
+        A deterministic `disposition > threshold` comparison, evaluated every step over a
+        144-month run, makes violence a function of the LIFETIME MAXIMUM of disposition,
+        and maxima of long noisy series are near-homogeneous. The smooth hazard makes the
+        whole trajectory count: a man who sits high for years differs from one who spiked
+        once. TRIGGER_SLOPE -> 0 recovers the deterministic comparison exactly.
         """
         gap = self.disposition - self.threshold
         if TRIGGER_SLOPE <= 0:
@@ -931,7 +922,7 @@ class Woman(Person):
         # ACTION_DENOUNCE_SHARE governs (which act) — and it does not lose the acts whose
         # Break branch finds no relationship to end. Reset annually.
         self.action_times = 0
-        # Denunciation EVENTS this year. `denounce` is a flag ("denounced at all this
+        # Report EVENTS this year. `denounce` is a flag ("reported at all this
         # year") read by peer_action_norm and by the output tables; this is its
         # event-level counterpart, the twin of break_times, so that
         # action_times - denounce_times - break_times is exactly the acts whose Break
@@ -961,8 +952,7 @@ class Woman(Person):
         accumulated victimisation (affective), the peer action norm (social), and economic
         autonomy (deliberative). Weights sum to 1, so the target lives in [0, 1].
 
-        Assaults received deliberately do NOT feed `disposition` (agitation) in this
-        version: that would close the escalation loop through Men.partner_component, and
+        Assaults received do NOT feed `disposition` (agitation): that would close the escalation loop through Men.partner_component, and
         the loop gain would then be entangled with the prevalence calibration.
         """
         experience = min(self.n_received_attacks / ACTION_EXPERIENCE_REF, 1.0)
@@ -985,10 +975,8 @@ class Woman(Person):
     def trigger_call_help(self):
         """Victim decision stage: Denounce, Break or Remain, following an assault.
 
-        Gated on an assault in THIS step, matching the paper. The previous gate read the
-        cumulative `got_attacked` counter, which year_register happens to reset annually —
-        so whether a woman drew an action every month or only after an assault depended on
-        which harness was running the model.
+        Gated on an assault in THIS step (`attacked_this_step`), so the stage runs only
+        after an assault whatever harness steps the model.
         """
         if not self.attacked_this_step:
             return
@@ -1019,10 +1007,10 @@ class Woman(Person):
 
         self.denounce = True
         self.denounce_times += 1
-        # Two stages, not one: the denunciation may or may not carry a request for an
+        # Two stages, not one: the report may or may not carry a request for an
         # MPU, and the request may or may not be granted. P_MPU_GRANTED is conditional
         # on a request having been made (CNJ counts concedidas/solicitadas), so a
-        # denunciation reaches an order with probability P_MPU_REQUESTED x P_MPU_GRANTED.
+        # report reaches an order with probability P_MPU_REQUESTED x P_MPU_GRANTED.
         # The order is sought against whoever assaulted her — the partner she still has or
         # the one she left.
         aggressor = self.spouse if isinstance(self.spouse, Men) else self.ex_partner
